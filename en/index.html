@@ -1,12 +1,11 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="en">
 <head>
-<script>try{var _l=new URLSearchParams(location.search).get('lang');if(_l==='ko'||_l==='en')localStorage.setItem('pdfc_lang',_l);}catch(e){}</script>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>PDF 용량 줄이기 — 업로드 없이 브라우저에서 압축 | CODINGNOW</title>
-<meta name="description" content="PDF 용량을 브라우저 안에서 줄입니다. 파일은 서버로 올라가지 않습니다. 글자는 그대로 두고 사진만 다시 압축하거나, 스캔본은 페이지를 이미지로 줄입니다." />
-<link rel="canonical" href="https://www.coding-now.com/pdf-compressor" />
+<title>Compress PDF — reduce PDF file size in your browser, no upload | CODINGNOW</title>
+<meta name="description" content="Reduce PDF file size inside your browser. The file is never sent to a server or anywhere else. Fit an upload size limit, or split by pages when it is still too big." />
+<link rel="canonical" href="https://www.coding-now.com/en/pdf-compressor" />
 <meta name="robots" content="noindex,follow" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -30,6 +29,9 @@
   .langtoggle button{ padding:6px 14px; font-size:12px; color:var(--muted); background:var(--panel-2); border:none; cursor:pointer; font-family:inherit; }
   .langtoggle button + button{ border-left:1px solid var(--line); }
   .langtoggle button.active{ background:var(--amber); color:#1a1304; font-weight:700; }
+  .langtoggle a{ padding:6px 14px; font-size:12px; color:var(--muted); background:var(--panel-2); text-decoration:none; }
+  .langtoggle a + a{ border-left:1px solid var(--line); }
+  .langtoggle a.active{ background:var(--amber); color:#1a1304; font-weight:700; }
   @media (max-width:560px){ .langtoggle{ position:static; margin-bottom:10px; } }
   html.embedded body{ min-height:0; }
   .grid{ display:grid; grid-template-columns:1fr 1fr; gap:18px; }
@@ -84,8 +86,8 @@
 <div class="wrap">
   <header>
     <div class="langtoggle" id="langToggle">
-      <button type="button" data-lang="ko" class="active">KR</button>
-      <button type="button" data-lang="en">EN</button>
+      <a href="../ko/">KR</a>
+      <a href="../en/" class="active">EN</a>
     </div>
     <div class="brand">CODINGNOW · PDF TOOL</div>
     <h1 data-i18n="title">PDF 용량 줄이기</h1>
@@ -164,10 +166,10 @@
   </div>
 </div>
 
-<script src="vendor/pdf-lib.min.js"></script>
+<script src="../vendor/pdf-lib.min.js"></script>
 <script type="module">
-import * as pdfjsLib from "./vendor/pdf.min.mjs";
-pdfjsLib.GlobalWorkerOptions.workerSrc = new URL("./vendor/pdf.worker.min.mjs", import.meta.url).href;
+import * as pdfjsLib from "../vendor/pdf.min.mjs";
+pdfjsLib.GlobalWorkerOptions.workerSrc = new URL("../vendor/pdf.worker.min.mjs", import.meta.url).href;
 // 처리 엔진(worker)을 페이지가 열릴 때 한 번만 띄워 두고 계속 쓴다. 문서를 열 때마다 새로 띄우면 그때마다
 // 라이브러리 파일을 다시 받아(GET 4번, 2026-10-06 실측) '처리 중 네트워크 요청 0' 이 안 된다.
 const pdfWorker = new pdfjsLib.PDFWorker({ name: "pdfc" });
@@ -248,8 +250,7 @@ const PRESETS = {
   images: { light: { maxPx: 2400, q: 0.85 }, medium: { maxPx: 1800, q: 0.72 }, strong: { maxPx: 1200, q: 0.55 } },
   raster: { light: { dpi: 200, q: 0.80 }, medium: { dpi: 150, q: 0.70 }, strong: { dpi: 110, q: 0.55 } },
 };
-let lang = "ko";
-try { const s = localStorage.getItem("pdfc_lang"); if (s === "en" || s === "ko") lang = s; } catch (e) {}
+let lang = "en"; // 단일 언어 버전(en/) — 다른 언어는 ../ko/
 const t = () => I18N[lang];
 const $ = (id) => document.getElementById(id);
 function applyLang() {

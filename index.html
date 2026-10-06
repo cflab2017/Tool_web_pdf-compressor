@@ -139,7 +139,7 @@
       </div>
 
       <button class="btn" id="run" data-i18n="run" disabled>PDF 줄이기</button>
-      <div class="privacy" data-i18n-html="privacy">🔒 PDF 는 <b>이 브라우저 안에서만</b> 처리됩니다. 서버로 보내지 않습니다.</div>
+      <div class="privacy" data-i18n-html="privacy">🔒 PDF 는 <b>이 브라우저 안에서만</b> 처리됩니다. 서버나 다른 어떤 곳으로도 <b>보내지 않습니다</b>. 도구가 열린 뒤에는 인터넷을 끊어도 동작합니다.</div>
     </section>
 
     <section class="panel">
@@ -168,6 +168,9 @@
 <script type="module">
 import * as pdfjsLib from "./vendor/pdf.min.mjs";
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL("./vendor/pdf.worker.min.mjs", import.meta.url).href;
+// 처리 엔진(worker)을 페이지가 열릴 때 한 번만 띄워 두고 계속 쓴다. 문서를 열 때마다 새로 띄우면 그때마다
+// 라이브러리 파일을 다시 받아(GET 4번, 2026-10-06 실측) '처리 중 네트워크 요청 0' 이 안 된다.
+const pdfWorker = new pdfjsLib.PDFWorker({ name: "pdfc" });
 // objectsPerTick: Infinity — pdf-lib 는 기본으로 객체 몇 개마다 setTimeout 으로 쉬는데, 숨은 탭에서는 타이머가 1초로 늦춰져
 // 읽기·저장이 수십 배 느려진다(2026-10-06 실측). 쉬지 않고 한 번에 처리한다.
 const { PDFDocument, PDFName, PDFRawStream, PDFArray, PDFNumber, PDFDict, PDFRef } = PDFLib;
@@ -184,7 +187,7 @@ const I18N = {
     hintImages: { light: "사진 긴 변 최대 2400px · JPEG 품질 85", medium: "사진 긴 변 최대 1800px · JPEG 품질 72", strong: "사진 긴 변 최대 1200px · JPEG 품질 55" },
     hintRaster: { light: "페이지를 200dpi · JPEG 품질 80 으로", medium: "페이지를 150dpi · JPEG 품질 70 으로", strong: "페이지를 110dpi · JPEG 품질 55 로" },
     run: "PDF 줄이기", download: "줄인 PDF 다운로드", reset: "다른 PDF",
-    privacy: "🔒 PDF 는 <b>이 브라우저 안에서만</b> 처리됩니다. 서버로 보내지 않습니다.",
+    privacy: "🔒 PDF 는 <b>이 브라우저 안에서만</b> 처리됩니다. 서버나 다른 어떤 곳으로도 <b>보내지 않습니다</b>. 도구가 열린 뒤에는 인터넷을 끊어도 동작합니다.",
     waiting: "PDF 를 기다리는 중…", iName: "파일", iPages: "페이지", iOrig: "원래 크기", iNew: "줄인 크기", iDelta: "변화", iDone: "처리",
     reading: "PDF 읽는 중…", imgStep: (i, n) => `사진 다시 압축 중… ${i}/${n}`, pageStep: (i, n) => `페이지 변환 중… ${i}/${n}`,
     saving: "저장 중…", checking: "결과 확인 중…", done: "완료",
@@ -217,7 +220,7 @@ const I18N = {
     hintImages: { light: "Images up to 2400 px on the long side · JPEG quality 85", medium: "Images up to 1800 px · JPEG quality 72", strong: "Images up to 1200 px · JPEG quality 55" },
     hintRaster: { light: "Pages at 200 dpi · JPEG quality 80", medium: "Pages at 150 dpi · JPEG quality 70", strong: "Pages at 110 dpi · JPEG quality 55" },
     run: "Compress PDF", download: "Download compressed PDF", reset: "Another PDF",
-    privacy: "🔒 Your PDF is processed <b>only in this browser</b>. It is never uploaded.",
+    privacy: "🔒 Your PDF is processed <b>only in this browser</b>. It is <b>never sent</b> to a server or anywhere else. Once the tool has loaded, it works even with the internet off.",
     waiting: "Waiting for a PDF…", iName: "File", iPages: "Pages", iOrig: "Original", iNew: "Compressed", iDelta: "Change", iDone: "Done",
     reading: "Reading PDF…", imgStep: (i, n) => `Recompressing images… ${i}/${n}`, pageStep: (i, n) => `Converting pages… ${i}/${n}`,
     saving: "Saving…", checking: "Checking the result…", done: "Done",
@@ -306,7 +309,7 @@ async function takeFile(f) {
   $("run").disabled = false;
   setStatus(f.size > 80 * 1048576 ? t().big : "", null);
   try {
-    const doc = await pdfjsLib.getDocument({ data: srcBytes.slice() }).promise;
+    const doc = await pdfjsLib.getDocument({ data: srcBytes.slice(), worker: pdfWorker }).promise;
     $("iPages").textContent = doc.numPages;
     await drawThumb(doc);
     doc.destroy();
@@ -549,7 +552,7 @@ async function compressImages(bytes, preset) {
 /* ---------- 방식 2: 페이지를 이미지로 ---------- */
 async function rasterize(bytes, preset) {
   setStatus(t().reading, 0);
-  const src = await pdfjsLib.getDocument({ data: bytes.slice() }).promise;
+  const src = await pdfjsLib.getDocument({ data: bytes.slice(), worker: pdfWorker }).promise;
   const out = await PDFDocument.create();
   for (let p = 1; p <= src.numPages; p++) {
     setStatus(t().pageStep(p, src.numPages), p / (src.numPages + 1));
@@ -587,7 +590,7 @@ async function renderSmall(doc, n, scale) {
   return g.getImageData(0, 0, c.width, c.height).data;
 }
 async function verify(srcDoc, outBytes, from, to, onStep) {
-  const out = await pdfjsLib.getDocument({ data: outBytes.slice() }).promise;
+  const out = await pdfjsLib.getDocument({ data: outBytes.slice(), worker: pdfWorker }).promise;
   try {
     const expect = to - from + 1;
     if (out.numPages !== expect) return { ok: false, why: `pages ${out.numPages}/${expect}` };
@@ -685,7 +688,7 @@ $("run").addEventListener("click", async () => {
     const before = srcBytes.length;
     if (best.length >= before) best = srcBytes; // 안 줄었으면 원본 그대로 이어서(나누기만 할 수도 있다)
 
-    srcDoc = await pdfjsLib.getDocument({ data: srcBytes.slice() }).promise;
+    srcDoc = await pdfjsLib.getDocument({ data: srcBytes.slice(), worker: pdfWorker }).promise;
     const tc = performance.now();
     if (best !== srcBytes) {
       const v = await verify(srcDoc, best, 1, srcDoc.numPages, (i, n) => setStatus(t().verifying(i, n), i / n));
@@ -696,7 +699,7 @@ $("run").addEventListener("click", async () => {
       notes.push(t().verifyOk(v.pages));
     }
     lap("check", tc);
-    const check = await pdfjsLib.getDocument({ data: best.slice() }).promise;
+    const check = await pdfjsLib.getDocument({ data: best.slice(), worker: pdfWorker }).promise;
     await drawThumb(check); check.destroy();
 
     const after = best.length, pct = (after - before) / before * 100;
